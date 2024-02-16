@@ -1,0 +1,59 @@
+﻿@page "/"
+@using AsyncSemanticKernelResponse.Client.Services
+@using System.Text
+@using Microsoft.AspNetCore.Components.WebAssembly.Http
+@using Microsoft.SemanticKernel
+@using System.Text.Json
+
+<PageTitle>Home</PageTitle>
+
+<h1>Hello, world!</h1>
+<h5>On server side, KernelStreamingService.cs, await Task.Delay(3000) at line 17</h5>
+<h5>On server side, put your Azure OpenAI information in Program.cs</h5>
+
+<button @onclick="@(async () => await OnStreamingAsync())">Try streaming!</button>
+<table>
+    <thead>
+        <tr>
+            <th>Recognized Commands</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var command in Commands)
+        {
+            <tr>
+                <td>@command</td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+@code {
+    [Inject]
+    HttpClient? HttpClient { get; init; }
+
+    private IList<object> Commands = [];
+
+    async Task OnStreamingAsync()
+    {
+        Commands = [];
+
+        StateHasChanged();
+
+        HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, "commands");
+
+        // https://www.tpeczek.com/2021/12/aspnet-core-6-and-iasyncenumerable.html
+        // It's very important for streaming
+        request.SetBrowserResponseStreamingEnabled(true);
+
+        using HttpResponseMessage response = await HttpClient!.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
+
+        response.EnsureSuccessStatusCode();
+
+        await foreach (var command in response.Content.ReadFromJsonAsAsyncEnumerable<object>())
+        {
+            Commands.Add(command!);
+            StateHasChanged();
+        }
+    }
+}
